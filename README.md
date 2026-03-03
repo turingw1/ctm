@@ -7,7 +7,8 @@ This repository houses the official PyTorch implementation of the paper titled "
 * [arXiv](https://arxiv.org/abs/2310.02279)
 * [Project Page](https://consistencytrajectorymodel.github.io/CTM/) 
 * [OpenReview](https://openreview.net/forum?id=ymjI8feDTD)
-* [ (NEW!) Codes of CIFAR-10](https://github.com/Kim-Dongjun/ctm-cifar10)
+* [Codes of CIFAR-10](https://github.com/Kim-Dongjun/ctm-cifar10)
+* [(NEW!) Jupyter Notebook](https://github.com/ChiehHsinJesseLai/ctm-notebook)
 
 Contacts:
 * Dongjun KIM: <a href="dongjun@stanford.edu">dongjun@stanford.edu</a>

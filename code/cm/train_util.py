@@ -802,10 +802,12 @@ class CMTrainLoop(TrainLoop):
             if (
                 self.global_step
                 and self.args.eval_interval != -1
-                and self.global_step % self.args.eval_interval == self.args.eval_interval - 1
-                #and self.step - self.initial_step > 10
-                or self.step == self.args.lr_anneal_steps - 1
-                or self.global_step == self.total_training_steps - 1
+                and (
+                    self.global_step % self.args.eval_interval == self.args.eval_interval - 1
+                    #and self.step - self.initial_step > 10
+                    or self.step == self.args.lr_anneal_steps - 1
+                    or self.global_step == self.total_training_steps - 1
+                )
             ):
                 if self.args.gpu_usage:
                     self.print_gpu_usage('Before emptying cache in evaluation 1')
@@ -840,11 +842,13 @@ class CMTrainLoop(TrainLoop):
             dist.barrier()
             if (
                     self.global_step
-                    and self.args.eval_interval != -1
-                    and self.global_step % self.args.save_check_period == self.args.save_check_period - 1
-                    #and self.step - self.initial_step > 10000
-                    or self.step == self.args.lr_anneal_steps - 1
-                    or self.global_step == self.total_training_steps - 1
+                    and self.args.save_check_period != -1
+                    and (
+                        self.global_step % self.args.save_check_period == self.args.save_check_period - 1
+                        #and self.step - self.initial_step > 10000
+                        or self.step == self.args.lr_anneal_steps - 1
+                        or self.global_step == self.total_training_steps - 1
+                    )
             ):
                 gc.collect()
                 th.cuda.empty_cache()

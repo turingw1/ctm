@@ -7,9 +7,18 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
-from flash_attn.flash_attn_interface import flash_attn_varlen_qkvpacked_func
-from flash_attn.bert_padding import unpad_input, pad_input
-from xformers.components.attention import ScaledDotProduct
+try:
+    from flash_attn.flash_attn_interface import flash_attn_varlen_qkvpacked_func
+    from flash_attn.bert_padding import unpad_input, pad_input
+except ImportError:
+    flash_attn_varlen_qkvpacked_func = None
+    unpad_input = None
+    pad_input = None
+
+try:
+    from xformers.components.attention import ScaledDotProduct
+except ImportError:
+    ScaledDotProduct = None
 
 from .fp16_util import convert_module_to_f16, convert_module_to_f32
 from .nn import (
@@ -309,8 +318,14 @@ class AttentionBlock(nn.Module):
         self.qkv = conv_nd(dims, channels, channels * 3, 1)
         self.attention_type = attention_type
         if attention_type == "flash":
-            self.attention = QKVFlashAttention(channels, self.num_heads)
+            if flash_attn_varlen_qkvpacked_func is None:
+                self.attention_type = "legacy"
+                self.attention = QKVAttentionLegacy(self.num_heads)
+            else:
+                self.attention = QKVFlashAttention(channels, self.num_heads)
         elif attention_type == 'xformer':
+            if ScaledDotProduct is None:
+                raise ImportError("attention_type='xformer' requires xformers")
             self.attention = XformersAttention(self.num_heads)
         else:
             # split heads before split qkv

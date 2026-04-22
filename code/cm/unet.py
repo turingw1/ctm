@@ -331,9 +331,11 @@ class AttentionBlock(nn.Module):
             # split heads before split qkv
             self.attention = QKVAttentionLegacy(self.num_heads)
 
-        self.use_attention_checkpoint = not (
-            self.use_checkpoint or self.attention_type == "flash"
-        )
+        # The legacy custom checkpoint wrapper in cm.nn is incompatible with
+        # recent PyTorch autograd internals. Keep attention eager for the
+        # conda/PyTorch 2.x training path; explicit UNet block checkpointing
+        # still follows use_checkpoint elsewhere.
+        self.use_attention_checkpoint = False
         if encoder_channels is not None:
             assert attention_type != "flash"
             self.encoder_kv = conv_nd(1, encoder_channels, channels * 2, 1)

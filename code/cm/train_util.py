@@ -656,44 +656,51 @@ class CMTrainLoop(TrainLoop):
                             rate=0.0, sampler='LSGM Auto-Encoder', log=False)
                         logger.log(f"Regenerated DM Samples (by LSGM AE) PSNR-50k: {psnr}, SSIM-10k: {ssim}")
         else:
-            import tensorflow.compat.v1 as tf
-            from cm.evaluator import Evaluator
-            if dist.get_rank() == 0:
-                config = tf.ConfigProto(
-                    allow_soft_placement=True  # allows DecodeJpeg to run on CPU in Inception graph
-                )
-                config.gpu_options.allow_growth = True
-                config.gpu_options.per_process_gpu_memory_fraction = 0.1
-                self.evaluator = Evaluator(tf.Session(config=config), batch_size=100)
+            needs_imagenet_eval = (
+                self.args.eval_fid
+                or self.args.eval_similarity
+                or self.args.check_dm_performance
+                or self.args.save_check_period != -1
+            )
+            if needs_imagenet_eval:
+                import tensorflow.compat.v1 as tf
+                from cm.evaluator import Evaluator
+                if dist.get_rank() == 0:
+                    config = tf.ConfigProto(
+                        allow_soft_placement=True  # allows DecodeJpeg to run on CPU in Inception graph
+                    )
+                    config.gpu_options.allow_growth = True
+                    config.gpu_options.per_process_gpu_memory_fraction = 0.1
+                    self.evaluator = Evaluator(tf.Session(config=config), batch_size=100)
 
-                self.ref_acts = self.evaluator.read_activations(self.args.ref_path)
-                self.ref_stats, self.ref_stats_spatial = self.evaluator.read_statistics(self.args.ref_path, self.ref_acts)
-                if self.args.check_dm_performance:
-                    if os.path.exists(os.path.join(os.path.join(self.args.dm_sample_path_seed_42, 'single_npz'), f'stats')):
-                        with open(os.path.join(os.path.join(self.args.dm_sample_path_seed_42, 'single_npz'), f'acts'), 'rb') as f:
-                            sample_acts = pickle.load(f)
-                            sample_acts = (sample_acts['acts'], sample_acts['acts_spatial'])
-                        with open(os.path.join(os.path.join(self.args.dm_sample_path_seed_42, 'single_npz'), f'stats'), 'rb') as f:
-                            sample_stats = pickle.load(f)
-                            sample_stats, sample_stats_spatial = (sample_stats['stats'], sample_stats['stats_spatial'])
-                    else:
-                        sample_acts, sample_stats, sample_stats_spatial = self.calculate_inception_stats(self.args.data_name,
-                                                                        self.args.dm_sample_path_seed_42,
-                                                                        num_samples=self.args.eval_num_samples)
-                    logger.log("Inception Score-50k:", self.evaluator.compute_inception_score(sample_acts[0]))
-                    logger.log("FID-50k:", sample_stats.frechet_distance(self.ref_stats))
-                    logger.log("sFID-50k:", sample_stats_spatial.frechet_distance(self.ref_stats_spatial))
-                    prec, recall = self.evaluator.compute_prec_recall(self.ref_acts[0], sample_acts[0])
-                    logger.log("Precision:", prec)
-                    logger.log("Recall:", recall)
-                    if self.args.gpu_usage:
-                        self.print_gpu_usage('After computing DM FIDs')
-                    #self.evaluator.sess.close()
-            gc.collect()
-            th.cuda.empty_cache()
-            tf.reset_default_graph()
-            if self.args.gpu_usage:
-                self.print_gpu_usage('After emptying cache')
+                    self.ref_acts = self.evaluator.read_activations(self.args.ref_path)
+                    self.ref_stats, self.ref_stats_spatial = self.evaluator.read_statistics(self.args.ref_path, self.ref_acts)
+                    if self.args.check_dm_performance:
+                        if os.path.exists(os.path.join(os.path.join(self.args.dm_sample_path_seed_42, 'single_npz'), f'stats')):
+                            with open(os.path.join(os.path.join(self.args.dm_sample_path_seed_42, 'single_npz'), f'acts'), 'rb') as f:
+                                sample_acts = pickle.load(f)
+                                sample_acts = (sample_acts['acts'], sample_acts['acts_spatial'])
+                            with open(os.path.join(os.path.join(self.args.dm_sample_path_seed_42, 'single_npz'), f'stats'), 'rb') as f:
+                                sample_stats = pickle.load(f)
+                                sample_stats, sample_stats_spatial = (sample_stats['stats'], sample_stats['stats_spatial'])
+                        else:
+                            sample_acts, sample_stats, sample_stats_spatial = self.calculate_inception_stats(self.args.data_name,
+                                                                            self.args.dm_sample_path_seed_42,
+                                                                            num_samples=self.args.eval_num_samples)
+                        logger.log("Inception Score-50k:", self.evaluator.compute_inception_score(sample_acts[0]))
+                        logger.log("FID-50k:", sample_stats.frechet_distance(self.ref_stats))
+                        logger.log("sFID-50k:", sample_stats_spatial.frechet_distance(self.ref_stats_spatial))
+                        prec, recall = self.evaluator.compute_prec_recall(self.ref_acts[0], sample_acts[0])
+                        logger.log("Precision:", prec)
+                        logger.log("Recall:", recall)
+                        if self.args.gpu_usage:
+                            self.print_gpu_usage('After computing DM FIDs')
+                        #self.evaluator.sess.close()
+                gc.collect()
+                th.cuda.empty_cache()
+                tf.reset_default_graph()
+                if self.args.gpu_usage:
+                    self.print_gpu_usage('After emptying cache')
 
 
     def print_gpu_usage(self, prefix=''):
